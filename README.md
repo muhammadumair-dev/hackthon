@@ -63,43 +63,29 @@ npm run build
 
 The integration suite starts a temporary MongoDB replica set and uses the real Express app and database operations.
 
-## Vercel deployment
+## Vercel multi-service deployment
 
-### Backend
+Import this repository as **one Vercel project** and leave the project root at the repository root. The root `vercel.json` defines two services:
 
-- Create a Vercel project connected to this repository and set root directory to `backend`.
-- Vercel detects the Express app exported from `backend/src/index.js`; do not set a custom build command.
-- The `src/index.js` serverless entry exports the same Express app used locally and does not call `listen()`.
-- Set the backend environment variables below in Vercel Project Settings.
-- `backend/vercel.json` sets a 60-second maximum duration and includes PDFKit font/data assets. Confirm the selected Vercel plan supports that duration.
+- `backend` uses the Express app exported by `backend/index.js` (which reuses `backend/src/index.js` and does not call `listen()`).
+- `frontend` builds with Vite into `dist`.
+- Public `/api/*` requests go to the backend, and all other public paths go to the frontend. The backend receives the original `/api/...` path.
+- The frontend uses same-origin `/api/...` requests in this deployment. Leave `VITE_API_URL` unset or empty in Vercel; no service binding is needed because browser requests use the public rewrite rather than a server-to-server call.
+- The frontend service has a SPA fallback rewrite. PDFKit assets and a 60-second backend function duration are configured on the backend service. Confirm that the Vercel plan supports this duration.
 
-### Frontend
-
-- Import the repository and set root directory to `frontend`.
-- Build command: `npm run build`
-- Output directory: `dist`
-- Set `VITE_API_URL` to the deployed backend origin without a trailing slash.
-- `frontend/vercel.json` rewrites application routes to `index.html`.
-
-### Environment variables
-
-Backend (Vercel project root: `backend`):
+Set these environment variables in Vercel for the deployment:
 
 | Variable | Required | Value |
 | --- | --- | --- |
-| `MONGO_URI` | Yes | MongoDB Atlas connection string; database transactions require a replica set |
+| `MONGO_URI` | Yes | MongoDB Atlas connection string; transactions require a replica set |
 | `JWT_SECRET` | Yes | Private random value of at least 32 characters |
-| `FRONTEND_URL` | Yes | Exact allowed frontend origins, comma-separated; include production and any preview Vercel URLs |
+| `FRONTEND_URL` | Yes | Exact shared deployment origin, e.g. `https://your-project.vercel.app`; add any preview origins that should be allowed, comma-separated |
 | `PORT` | Platform | Vercel supplies this; local server defaults to 5000 |
-| `AI_API_KEY` | Optional | Gemini key; configure only on the backend |
-| `ADMIN_EMAIL` | Optional | Reserved; create the first Admin at `/setup` |
-| `ADMIN_PASSWORD` | Optional | Reserved; create the first Admin at `/setup` |
+| `AI_API_KEY` | Optional | Gemini key; keep it server-side and never expose it as a `VITE_*` variable |
+| `VITE_API_URL` | No | Leave unset/empty in Vercel to use same-origin `/api`; local `.env.example` points to `http://localhost:5000` |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | No | Reserved placeholders; create the first Admin at `/setup` |
 
-Frontend (Vercel project root: `frontend`):
-
-| Variable | Required | Value |
-| --- | --- | --- |
-| `VITE_API_URL` | Yes | Public deployed backend origin; local `.env.example` uses `http://localhost:5000` |
+Vercel Services routes the frontend and backend on one deployment domain, so the browser does not need a separate backend URL. Configure the backend secrets (`MONGO_URI`, `JWT_SECRET`, and optionally `AI_API_KEY`) only for server-side use.
 
 ### MongoDB Atlas
 
